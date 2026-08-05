@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arduino Bluetooth Control &middot; ElectroBotics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#061f22;
+  --panel:#0a373a;
+  --panel-2:#0c2b2e;
+  --line:rgba(255,255,255,.10);
+  --line-2:rgba(255,255,255,.18);
+  --teal:#008fa0;
+  --teal-lift:#00b3c7;
+  --good:#8ab600;
+  --bad:#d76241;
+  --amber:#eab43a;
+  --ink:#e8f5f5;
+  --muted:#7fa6a9;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:'DM Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --r:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.5;
+  padding-bottom:40px;
+  overscroll-behavior-y:contain;
+}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.01em}
+button{font-family:inherit;font-size:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,select{font-family:inherit;font-size:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 14px}
+
+/* ---------- connect bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:60;
+  background:rgba(6,31,34,.94);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.topbar-in{display:flex;align-items:center;gap:10px;padding:10px 14px;max-width:1080px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.brand-mark{
+  width:30px;height:30px;border-radius:9px;flex:0 0 auto;
+  background:linear-gradient(150deg,var(--teal),#00636f);
+  display:grid;place-items:center;
+  font-family:var(--mono);font-weight:700;font-size:13px;color:#00171a;
+}
+.brand-txt{min-width:0}
+.brand-txt b{display:block;font-size:13.5px;line-height:1.15;white-space:nowrap}
+.brand-txt span{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.topbar-sp{flex:1}
+.conn-group{display:flex;gap:7px;align-items:center}
+.btn{
+  border:1px solid var(--line-2);
+  background:var(--panel);
+  border-radius:11px;
+  padding:9px 13px;
+  font-weight:500;font-size:13.5px;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:background .15s,border-color .15s,transform .08s;
+}
+.btn:hover:not(:disabled){background:#0d474b;border-color:var(--teal)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#00171a;font-weight:700}
+.btn.primary:hover:not(:disabled){background:var(--teal-lift);border-color:var(--teal-lift)}
+.btn.danger{border-color:rgba(215,98,65,.55);color:#ffb9a2}
+.btn.danger:hover{background:rgba(215,98,65,.16);border-color:var(--bad)}
+.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:9px}
+.dot{width:9px;height:9px;border-radius:50%;background:#4a6c6f;flex:0 0 auto}
+.dot.on{background:var(--good);box-shadow:0 0 0 4px rgba(138,182,0,.16)}
+.dot.busy{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.conn-pill{display:none;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line-2);border-radius:11px;padding:7px 8px 7px 12px}
+.conn-pill.show{display:flex}
+.conn-pill .nm{font-family:var(--mono);font-size:12.5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conn-pill .via{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+
+/* ---------- banner ---------- */
+.banner{margin:12px 0 0;padding:11px 13px;border-radius:12px;font-size:13.5px;display:none;gap:9px;align-items:flex-start}
+.banner.show{display:flex}
+.banner.warn{background:rgba(234,180,58,.11);border:1px solid rgba(234,180,58,.34);color:#f4d99a}
+.banner.err{background:rgba(215,98,65,.12);border:1px solid rgba(215,98,65,.4);color:#f5b9a3}
+.banner b{font-weight:700}
+
+/* ---------- layout ---------- */
+.cols{display:grid;grid-template-columns:1fr;gap:14px;margin-top:14px}
+@media(min-width:900px){.cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
+.card{background:var(--panel-2);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card-hd{
+  display:flex;align-items:center;gap:9px;
+  padding:12px 14px;
+  border-bottom:1px solid var(--line);
+  background:rgba(255,255,255,.02);
+}
+.card-hd h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);font-weight:700;color:#bfe0e2}
+.card-hd .sp{flex:1}
+.card-bd{padding:14px}
+.card.fold .card-hd{cursor:pointer}
+.card.fold.closed .card-bd{display:none}
+.chev{transition:transform .18s;color:var(--muted)}
+.card.fold.closed .chev{transform:rotate(-90deg)}
+
+/* ---------- dpad ---------- */
+.pad{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  grid-template-rows:repeat(3,1fr);
+  gap:9px;
+  max-width:330px;margin:0 auto;
+  aspect-ratio:1/1;
+}
+.pk{
+  border:1px solid var(--line-2);
+  background:var(--panel);
+  border-radius:15px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-weight:700;
+  transition:background .1s,border-color .1s,transform .06s;
+  touch-action:none;user-select:none;
+  position:relative;
+}
+.pk .gly{font-size:23px;line-height:1}
+.pk .lb{font-size:10.5px;font-family:var(--mono);color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.pk:active,.pk.held{background:var(--teal);border-color:var(--teal-lift);color:#00171a;transform:scale(.96)}
+.pk:active .lb,.pk.held .lb{color:rgba(0,23,26,.72)}
+.pk.stop{background:rgba(215,98,65,.13);border-color:rgba(215,98,65,.4)}
+.pk.stop:active,.pk.stop.held{background:var(--bad);border-color:var(--bad);color:#fff}
+.pk.blank{border-style:dashed;opacity:.3;pointer-events:none}
+.pk:focus-visible{outline:2px solid var(--teal-lift);outline-offset:2px}
+.pad-c{grid-column:2;grid-row:2}
+
+/* echo readout — the signature element */
+.echo{
+  margin:14px auto 0;max-width:330px;
+  border:1px solid var(--line);border-radius:11px;
+  background:var(--panel);
+  padding:9px 12px;
+  display:flex;align-items:center;gap:10px;
+  font-family:var(--mono);
+}
+.echo .k{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.echo .v{font-size:17px;font-weight:700;color:var(--good);letter-spacing:.04em;min-height:1.2em;transition:color .12s}
+.echo.flash .v{color:var(--teal-lift)}
+
+/* speed */
+.speed{margin-top:16px}
+.speed-hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+.speed-hd label{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.speed-hd output{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--amber)}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;background:transparent;height:26px}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--amber))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#eaf7f7;border:3px solid var(--panel-2);margin-top:-8px;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--amber))}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#eaf7f7;border:3px solid var(--panel-2)}
+input[type=range]:focus-visible{outline:2px solid var(--teal-lift);outline-offset:3px;border-radius:6px}
+
+/* extra buttons */
+.extras{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;margin-top:16px}
+.xb{
+  border:1px solid var(--line-2);background:var(--panel);border-radius:11px;
+  padding:11px 6px;text-align:center;font-weight:500;font-size:13px;
+  touch-action:none;user-select:none;
+}
+.xb small{display:block;font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:2px}
+.xb:active,.xb.held{background:var(--teal);border-color:var(--teal);color:#00171a}
+.xb:active small,.xb.held small{color:rgba(0,23,26,.7)}
+
+/* ---------- terminal ---------- */
+.term{
+  background:#04171a;border:1px solid var(--line);border-radius:11px;
+  height:210px;overflow-y:auto;padding:9px 11px;
+  font-family:var(--mono);font-size:12px;line-height:1.65;
+}
+.term .ln{display:flex;gap:8px;word-break:break-all}
+.term .ts{color:#3f6367;flex:0 0 auto}
+.term .ar{flex:0 0 auto;font-weight:700}
+.term .tx .ar{color:var(--teal-lift)}
+.term .rx .ar{color:var(--good)}
+.term .sys .ar,.term .sys .msg{color:var(--amber)}
+.term .er .ar,.term .er .msg{color:var(--bad)}
+.term .msg{flex:1;white-space:pre-wrap}
+.term-empty{color:#3f6367;font-style:italic}
+.sendrow{display:flex;gap:8px;margin-top:10px}
+.sendrow input{
+  flex:1;min-width:0;background:var(--panel);border:1px solid var(--line-2);
+  border-radius:10px;padding:10px 12px;color:var(--ink);font-family:var(--mono);font-size:13px;
+}
+.sendrow input:focus{outline:none;border-color:var(--teal)}
+.optrow{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:10px}
+.optrow label{font-family:var(--mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+select{
+  background:var(--panel);border:1px solid var(--line-2);border-radius:9px;
+  padding:6px 9px;color:var(--ink);font-family:var(--mono);font-size:12.5px;
+}
+select:focus{outline:none;border-color:var(--teal)}
+.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.chk input{accent-color:var(--teal);width:15px;height:15px}
+
+/* ---------- voice ---------- */
+.mic-wrap{display:flex;gap:12px;align-items:center}
+.mic{
+  width:62px;height:62px;flex:0 0 auto;border-radius:50%;
+  background:var(--panel);border:1px solid var(--line-2);
+  display:grid;place-items:center;font-size:25px;
+  transition:background .15s,box-shadow .15s;
+}
+.mic.live{background:var(--bad);border-color:var(--bad);box-shadow:0 0 0 8px rgba(215,98,65,.16);animation:mic 1.3s infinite}
+@keyframes mic{50%{box-shadow:0 0 0 14px rgba(215,98,65,.05)}}
+.mic:disabled{opacity:.35}
+.heard{flex:1;min-width:0}
+.heard .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.heard .v{font-size:15px;min-height:1.5em;color:#cfe8e9}
+.heard .v.mute{color:#4d7275;font-style:italic}
+.heard .hit{font-family:var(--mono);font-size:11.5px;margin-top:2px}
+.heard .hit.ok{color:var(--good)}
+.heard .hit.no{color:var(--bad)}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin-top:12px}
+th{
+  text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);font-weight:500;
+  padding:0 6px 7px;border-bottom:1px solid var(--line);
+}
+td{padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+td input,td select{
+  width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:7px 9px;color:var(--ink);font-size:13px;
+}
+td input.cmd{font-family:var(--mono)}
+td input:focus,td select:focus{outline:none;border-color:var(--teal)}
+.del{color:var(--muted);padding:6px 8px;border-radius:8px;line-height:1}
+.del:hover{color:var(--bad);background:rgba(215,98,65,.12)}
+.tcol-x{width:38px}
+
+/* modal */
+.veil{position:fixed;inset:0;background:rgba(3,15,17,.78);z-index:100;display:none;padding:16px;overflow-y:auto}
+.veil.show{display:block}
+.modal{max-width:640px;margin:24px auto;background:var(--panel-2);border:1px solid var(--line-2);border-radius:16px;overflow:hidden}
+.modal-hd{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.modal-hd h3{font-size:14px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.09em}
+.modal-bd{padding:16px;max-height:66vh;overflow-y:auto}
+.modal-ft{display:flex;gap:9px;justify-content:flex-end;padding:13px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.hint{font-size:12.5px;color:var(--muted);margin:0 0 4px}
+.grp{margin-bottom:20px}
+.grp>h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#bfe0e2;margin:0 0 4px;font-weight:700}
+
+.foot{text-align:center;font-family:var(--mono);font-size:10.5px;color:#3f6367;margin-top:22px;letter-spacing:.05em}
+@media(max-width:420px){
+  .brand-txt b{font-size:12.5px}
+  .btn{padding:8px 11px;font-size:12.5px}
+  .topbar-in{padding:9px 12px;gap:7px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="brand-mark">EB</div>
+      <div class="brand-txt"><b>Bluetooth Control</b><span>Arduino</span></div>
+    </div>
+    <div class="topbar-sp"></div>
+    <div class="conn-group" id="connGroup">
+      <button class="btn primary" id="btnBle">Connect BLE</button>
+      <button class="btn" id="btnSer">Serial</button>
+    </div>
+    <div class="conn-pill" id="connPill">
+      <span class="dot on" id="statDot"></span>
+      <span>
+        <span class="nm" id="devName">device</span>
+        <span class="via" id="devVia">ble</span>
+      </span>
+      <button class="btn danger sm" id="btnDisc">Disconnect</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="banner warn" id="bnWarn"></div>
+  <div class="banner err" id="bnErr"></div>
+
+  <div class="cols">
+    <!-- LEFT -->
+    <div>
+      <div class="card">
+        <div class="card-hd">
+          <h2>Controls</h2>
+          <div class="sp"></div>
+          <button class="btn sm" id="btnEdit">Edit buttons</button>
+        </div>
+        <div class="card-bd">
+          <div class="pad" id="pad"></div>
+
+          <div class="echo" id="echo">
+            <span class="k">Last sent</span>
+            <span class="v" id="echoV">&mdash;</span>
+          </div>
+
+          <div class="speed">
+            <div class="speed-hd">
+              <label for="spd">Speed</label>
+              <output id="spdOut">5</output>
+            </div>
+            <input type="range" id="spd" min="0" max="9" step="1" value="5">
+          </div>
+
+          <div class="extras" id="extras"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="card fold" id="cardVoice">
+        <div class="card-hd" data-fold>
+          <h2>Voice</h2>
+          <div class="sp"></div>
+          <button class="btn sm" id="btnPhrases">Phrases</button>
+          <span class="chev">&#9662;</span>
+        </div>
+        <div class="card-bd">
+          <div class="mic-wrap">
+            <button class="mic" id="mic" title="Hold to talk">&#127908;</button>
+            <div class="heard">
+              <div class="k">Heard</div>
+              <div class="v mute" id="heardV">nothing yet</div>
+              <div class="hit" id="heardHit"></div>
+            </div>
+          </div>
+          <div class="optrow">
+            <label class="chk"><input type="checkbox" id="vContinuous"> keep listening</label>
+            <label for="vLang">lang</label>
+            <select id="vLang">
+              <option value="en-IN">en-IN</option>
+              <option value="en-US">en-US</option>
+              <option value="en-GB">en-GB</option>
+              <option value="hi-IN">hi-IN</option>
+              <option value="ta-IN">ta-IN</option>
+              <option value="de-CH">de-CH</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card fold" id="cardTerm" style="margin-top:14px">
+        <div class="card-hd" data-fold>
+          <h2>Serial monitor</h2>
+          <div class="sp"></div>
+          <button class="btn sm" id="btnClear">Clear</button>
+          <span class="chev">&#9662;</span>
+        </div>
+        <div class="card-bd">
+          <div class="term" id="term"><div class="term-empty">Waiting for a connection&hellip;</div></div>
+          <div class="sendrow">
+            <input id="txIn" placeholder="Type a command" autocomplete="off" spellcheck="false">
+            <button class="btn primary" id="btnSend">Send</button>
+          </div>
+          <div class="optrow">
+            <label for="eol">line end</label>
+            <select id="eol">
+              <option value="">none</option>
+              <option value="\n" selected>\n</option>
+              <option value="\r\n">\r\n</option>
+            </select>
+            <label for="baud">baud</label>
+            <select id="baud">
+              <option>9600</option><option>19200</option><option>38400</option>
+              <option>57600</option><option>115200</option>
+            </select>
+            <label class="chk"><input type="checkbox" id="autoScroll" checked> autoscroll</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card fold closed" style="margin-top:14px">
+        <div class="card-hd" data-fold>
+          <h2>Setup</h2><div class="sp"></div><span class="chev">&#9662;</span>
+        </div>
+        <div class="card-bd">
+          <p class="hint">Keyboard on desktop: arrow keys or W A S D drive, space stops.</p>
+          <div class="optrow">
+            <button class="btn sm" id="btnExport">Export config</button>
+            <button class="btn sm" id="btnImport">Import config</button>
+            <button class="btn sm danger" id="btnReset">Reset to defaults</button>
+          </div>
+          <input type="file" id="fileIn" accept="application/json" hidden>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">ELECTROBOTICS &middot; HC-05 / HM-10 / ESP32</div>
+</div>
+
+<!-- button editor -->
+<div class="veil" id="veilBtn">
+  <div class="modal">
+    <div class="modal-hd"><h3>Edit buttons</h3></div>
+    <div class="modal-bd">
+      <div class="grp">
+        <h4>Drive pad</h4>
+        <p class="hint">Hold sends the command; release sends the stop command.</p>
+        <table><thead><tr><th>Button</th><th>Label</th><th>Command</th><th>Mode</th></tr></thead>
+        <tbody id="padRows"></tbody></table>
+      </div>
+      <div class="grp">
+        <h4>Speed slider</h4>
+        <p class="hint">Sends prefix + digit 0&ndash;9. Leave the prefix blank to send just the digit.</p>
+        <table><thead><tr><th>Prefix</th><th>Enabled</th></tr></thead>
+        <tbody><tr>
+          <td><input class="cmd" id="spdPrefix" placeholder="(none)"></td>
+          <td><label class="chk"><input type="checkbox" id="spdOn" checked> send on change</label></td>
+        </tr></tbody></table>
+      </div>
+      <div class="grp">
+        <h4>Extra buttons</h4>
+        <table><thead><tr><th>Label</th><th>Command</th><th>Mode</th><th class="tcol-x"></th></tr></thead>
+        <tbody id="xRows"></tbody></table>
+        <button class="btn sm" id="btnAddX" style="margin-top:10px">+ Add button</button>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="btnSaveBtns">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- phrase editor -->
+<div class="veil" id="veilPhr">
+  <div class="modal">
+    <div class="modal-hd"><h3>Voice phrases</h3></div>
+    <div class="modal-bd">
+      <p class="hint">Say any of these and the matching command is sent. Close matches count too, so &ldquo;move forward&rdquo; still triggers &ldquo;go forward&rdquo;.</p>
+      <table><thead><tr><th>Phrase</th><th>Command</th><th class="tcol-x"></th></tr></thead>
+      <tbody id="phrRows"></tbody></table>
+      <button class="btn sm" id="btnAddPhr" style="margin-top:10px">+ Add phrase</button>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="btnSavePhr">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. CONFIG
+   ============================================================ */
+var LS_KEY = "eb_bt_ctrl_v1";
+
+var DEFAULTS = {
+  pad: [
+    { id:"fwd",   gly:"\u25B2", label:"Forward",  cmd:"F", mode:"hold", cell:"1/2" },
+    { id:"left",  gly:"\u25C0", label:"Left",     cmd:"L", mode:"hold", cell:"2/1" },
+    { id:"stop",  gly:"\u25A0", label:"Stop",     cmd:"S", mode:"tap",  cell:"2/2" },
+    { id:"right", gly:"\u25B6", label:"Right",    cmd:"R", mode:"hold", cell:"2/3" },
+    { id:"back",  gly:"\u25BC", label:"Backward", cmd:"B", mode:"hold", cell:"3/2" }
+  ],
+  stopCmd: "S",
+  speed: { prefix:"", enabled:true, value:5 },
+  extras: [
+    { label:"Horn",       cmd:"H", mode:"tap" },
+    { label:"Light on",   cmd:"I", mode:"tap" },
+    { label:"Light off",  cmd:"O", mode:"tap" }
+  ],
+  phrases: [
+    { say:"go forward",  cmd:"F" },
+    { say:"go back",     cmd:"B" },
+    { say:"turn left",   cmd:"L" },
+    { say:"turn right",  cmd:"R" },
+    { say:"stop",        cmd:"S" },
+    { say:"full speed",  cmd:"9" },
+    { say:"slow down",   cmd:"3" },
+    { say:"lights on",   cmd:"I" },
+    { say:"lights off",  cmd:"O" },
+    { say:"horn",        cmd:"H" }
+  ],
+  eol: "\n",
+  baud: 9600,
+  lang: "en-IN"
+};
+
+var cfg = load();
+
+function load(){
+  try {
+    var raw = localStorage.getItem(LS_KEY);
+    if (!raw) return clone(DEFAULTS);
+    var o = JSON.parse(raw);
+    var d = clone(DEFAULTS);
+    for (var k in d) if (!(k in o)) o[k] = d[k];
+    return o;
+  } catch(e){ return clone(DEFAULTS); }
+}
+function save(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch(e){}
+}
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function $(s){ return document.querySelector(s); }
+
+/* ============================================================
+   2. TRANSPORT LAYER  (BLE + Web Serial behind one interface)
+   ============================================================ */
+
+// Services we ask permission for. Discovery is by characteristic
+// PROPERTIES, not by hard-coded characteristic UUIDs, so this works
+// across Nordic UART, HM-10, and the Microchip clones.
+var SERVICE_UUIDS = [
+  "6e400001-b5a3-f393-e0a9-e50e24dcca9e",           // Nordic UART (ESP32, micro:bit)
+  0xFFE0,                                            // HM-10 / CC2541
+  0xFFE5,                                            // HM-10 variants
+  0xFF00,                                            // some JDY / AT-09 clones
+  "49535343-fe7d-4ae5-8fa9-9fafd205e455"            // Microchip BM70 / RN4870
+];
+
+var Link = {
+  kind: null,       // "ble" | "serial"
+  name: "",
+  connected: false,
+  _ble: { dev:null, tx:null },
+  _ser: { port:null, writer:null, reader:null, keepReading:false },
+  _q: Promise.resolve()
+};
+
+Link.connectBLE = async function(){
+  if (!navigator.bluetooth) throw new Error("This browser has no Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS, or Linux.");
+  setStatus("busy");
+  var dev = await navigator.bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: SERVICE_UUIDS
+  });
+  var server = await dev.gatt.connect();
+  var services = await server.getPrimaryServices();
+
+  var txChar = null, rxChar = null;
+  for (var i = 0; i < services.length; i++){
+    var chars = await services[i].getCharacteristics();
+    for (var j = 0; j < chars.length; j++){
+      var c = chars[j], p = c.properties;
+      if (!txChar && (p.write || p.writeWithoutResponse)) txChar = c;
+      if (!rxChar && (p.notify || p.indicate)) rxChar = c;
+    }
+    if (txChar && rxChar) break;
+  }
+  if (!txChar) { try{ dev.gatt.disconnect(); }catch(e){} throw new Error("No writable characteristic on this device. Check that the module is a BLE module, not an HC-05."); }
+
+  if (rxChar){
+    await rxChar.startNotifications();
+    rxChar.addEventListener("characteristicvaluechanged", function(ev){
+      onBytes(new Uint8Array(ev.target.value.buffer));
+    });
+  }
+  dev.addEventListener("gattserverdisconnected", function(){ Link._down("Device disconnected."); });
+
+  Link._ble.dev = dev;
+  Link._ble.tx = txChar;
+  Link.kind = "ble";
+  Link.name = dev.name || "BLE device";
+  Link.connected = true;
+  onUp(rxChar ? "" : "Connected, but this device sends nothing back \u2014 the monitor will stay empty.");
+};
+
+Link.connectSerial = async function(){
+  if (!navigator.serial) throw new Error("This browser has no Web Serial. Use Chrome or Edge on a desktop \u2014 phones cannot open COM ports.");
+  setStatus("busy");
+  var port = await navigator.serial.requestPort();
+  await port.open({ baudRate: Number(cfg.baud) || 9600 });
+  Link._ser.port = port;
+  Link._ser.writer = port.writable.getWriter();
+  Link.kind = "serial";
+  Link.name = portLabel(port);
+  Link.connected = true;
+  Link._ser.keepReading = true;
+  readLoop();
+  onUp("");
+};
+
+function portLabel(port){
+  try {
+    var i = port.getInfo();
+    if (i && i.usbVendorId != null)
+      return "COM \u00b7 " + hex4(i.usbVendorId) + ":" + hex4(i.usbProductId);
+  } catch(e){}
+  return "Serial port";
+}
+function hex4(n){ return ("000" + n.toString(16)).slice(-4).toUpperCase(); }
+
+async function readLoop(){
+  while (Link._ser.port && Link._ser.port.readable && Link._ser.keepReading){
+    var reader = Link._ser.port.readable.getReader();
+    Link._ser.reader = reader;
+    try {
+      for(;;){
+        var r = await reader.read();
+        if (r.done) break;
+        if (r.value) onBytes(r.value);
+      }
+    } catch(e){
+      if (Link._ser.keepReading) log("er", String(e.message || e));
+    } finally {
+      try { reader.releaseLock(); } catch(e){}
+    }
+  }
+}
+
+Link.disconnect = async function(){
+  if (Link.kind === "ble"){
+    try { if (Link._ble.dev && Link._ble.dev.gatt.connected) Link._ble.dev.gatt.disconnect(); } catch(e){}
+  } else if (Link.kind === "serial"){
+    Link._ser.keepReading = false;
+    try { if (Link._ser.reader) await Link._ser.reader.cancel(); } catch(e){}
+    try { if (Link._ser.writer){ Link._ser.writer.releaseLock(); Link._ser.writer = null; } } catch(e){}
+    try { if (Link._ser.port) await Link._ser.port.close(); } catch(e){}
+    Link._ser.port = null;
+  }
+  Link._down("Disconnected.");
+};
+
+Link._down = function(msg){
+  Link.connected = false;
+  Link.kind = null;
+  Link._ble.dev = null; Link._ble.tx = null;
+  setStatus("off");
+  log("sys", msg);
+};
+
+// Serialised writes — GATT throws if two writes overlap.
+Link.write = function(text){
+  if (!Link.connected) { showErr("Not connected. Tap Connect BLE or Serial first."); return; }
+  var bytes = new TextEncoder().encode(text);
+  Link._q = Link._q.then(async function(){
+    if (Link.kind === "ble"){
+      var c = Link._ble.tx;
+      // BLE writes cap at ~20 bytes on many stacks; chunk to be safe.
+      for (var i = 0; i < bytes.length; i += 20){
+        var slice = bytes.slice(i, i + 20);
+        if (c.properties.writeWithoutResponse && c.writeValueWithoutResponse) await c.writeValueWithoutResponse(slice);
+        else if (c.writeValueWithResponse) await c.writeValueWithResponse(slice);
+        else await c.writeValue(slice);
+      }
+    } else if (Link.kind === "serial" && Link._ser.writer){
+      await Link._ser.writer.write(bytes);
+    }
+  }).catch(function(e){
+    log("er", "Send failed: " + (e.message || e));
+  });
+};
+
+/* ============================================================
+   3. RX buffering — split on newline, flush stragglers
+   ============================================================ */
+var rxBuf = "", rxTimer = null;
+function onBytes(u8){
+  rxBuf += new TextDecoder().decode(u8);
+  var parts = rxBuf.split(/\r?\n/);
+  rxBuf = parts.pop();
+  for (var i = 0; i < parts.length; i++) if (parts[i] !== "") log("rx", parts[i]);
+  clearTimeout(rxTimer);
+  if (rxBuf) rxTimer = setTimeout(function(){ if(rxBuf){ log("rx", rxBuf); rxBuf = ""; } }, 260);
+}
+
+/* ============================================================
+   4. Command funnel — every control ends up here
+   ============================================================ */
+var lastSent = "";
+function send(cmd, opts){
+  if (cmd === "" || cmd == null) return;
+  var eol = (opts && opts.raw) ? "" : (cfg.eol || "");
+  Link.write(cmd + eol);
+  log("tx", cmd);
+  echo(cmd);
+}
+function echo(cmd){
+  lastSent = cmd;
+  var e = $("#echo"), v = $("#echoV");
+  v.textContent = cmd;
+  e.classList.add("flash");
+  setTimeout(function(){ e.classList.remove("flash"); }, 160);
+}
+
+/* ============================================================
+   5. Terminal
+   ============================================================ */
+var termEl = $("#term"), termCount = 0;
+function log(kind, msg){
+  if (termCount === 0) termEl.innerHTML = "";
+  termCount++;
+  if (termCount > 400){ termEl.removeChild(termEl.firstChild); }
+  var arrow = kind === "tx" ? "\u25B6" : kind === "rx" ? "\u25C0" : kind === "er" ? "!" : "\u00b7";
+  var row = document.createElement("div");
+  row.className = "ln " + kind;
+  var t = new Date();
+  row.innerHTML =
+    '<span class="ts">' + pad2(t.getHours()) + ":" + pad2(t.getMinutes()) + ":" + pad2(t.getSeconds()) + '</span>' +
+    '<span class="ar">' + arrow + '</span>' +
+    '<span class="msg"></span>';
+  row.lastChild.textContent = msg;
+  termEl.appendChild(row);
+  if ($("#autoScroll").checked) termEl.scrollTop = termEl.scrollHeight;
+}
+function pad2(n){ return n < 10 ? "0" + n : "" + n; }
+
+/* ============================================================
+   6. Status + banners
+   ============================================================ */
+function setStatus(s){
+  var dot = $("#statDot"), grp = $("#connGroup"), pill = $("#connPill");
+  dot.className = "dot" + (s === "on" ? " on" : s === "busy" ? " busy" : "");
+  if (s === "on"){ grp.style.display = "none"; pill.classList.add("show"); }
+  else { grp.style.display = "flex"; pill.classList.remove("show"); }
+}
+function onUp(note){
+  setStatus("on");
+  $("#devName").textContent = Link.name;
+  $("#devVia").textContent = Link.kind === "ble" ? "bluetooth le" : "serial " + cfg.baud;
+  hideErr();
+  log("sys", "Connected to " + Link.name + ".");
+  if (note) log("sys", note);
+}
+function showErr(m){ var b = $("#bnErr"); b.innerHTML = "<b>&#9888;</b><span></span>"; b.lastChild.textContent = m; b.classList.add("show"); }
+function hideErr(){ $("#bnErr").classList.remove("show"); }
+
+function capabilityCheck(){
+  var miss = [];
+  if (!navigator.bluetooth) miss.push("Web Bluetooth");
+  if (!navigator.serial) miss.push("Web Serial");
+  $("#btnBle").disabled = !navigator.bluetooth;
+  $("#btnSer").disabled = !navigator.serial;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ $("#mic").disabled = true; $("#heardV").textContent = "voice not supported in this browser"; }
+  if (miss.length === 2){
+    banner("warn", "<b>No Bluetooth or serial access.</b> This app needs Chrome or Edge. Safari and Firefox do not support either API.");
+  } else if (miss.length === 1){
+    banner("warn", "<b>" + miss[0] + " is unavailable here.</b> " +
+      (miss[0] === "Web Serial"
+        ? "That is normal on a phone \u2014 use a BLE module (HM-10 or ESP32). HC-05 over serial needs a desktop."
+        : "Connect your paired HC-05 through Serial instead."));
+  }
+  if (location.protocol !== "https:" && location.hostname !== "localhost"){
+    banner("warn", "<b>Open this page over HTTPS.</b> Bluetooth, serial, and the microphone are all blocked on plain http.");
+  }
+}
+function banner(kind, html){
+  var b = kind === "err" ? $("#bnErr") : $("#bnWarn");
+  b.innerHTML = html;
+  b.classList.add("show");
+}
+
+/* ============================================================
+   7. Pad + extras rendering
+   ============================================================ */
+function renderPad(){
+  var pad = $("#pad");
+  pad.innerHTML = "";
+  var used = {};
+  cfg.pad.forEach(function(b){
+    var el = document.createElement("button");
+    el.className = "pk" + (b.id === "stop" ? " stop" : "");
+    el.type = "button";
+    el.innerHTML = '<span class="gly">' + b.gly + '</span><span class="lb"></span>';
+    el.lastChild.textContent = b.label;
+    var rc = b.cell.split("/");
+    el.style.gridRow = rc[0]; el.style.gridColumn = rc[1];
+    used[b.cell] = 1;
+    bindKey(el, b);
+    el.setAttribute("aria-label", b.label + " — sends " + b.cmd);
+    pad.appendChild(el);
+  });
+  // fill empty corners so the grid keeps its shape
+  ["1/1","1/3","3/1","3/3"].forEach(function(cell){
+    if (used[cell]) return;
+    var d = document.createElement("div");
+    d.className = "pk blank";
+    var rc = cell.split("/");
+    d.style.gridRow = rc[0]; d.style.gridColumn = rc[1];
+    pad.appendChild(d);
+  });
+}
+
+function renderExtras(){
+  var box = $("#extras");
+  box.innerHTML = "";
+  cfg.extras.forEach(function(b){
+    var el = document.createElement("button");
+    el.className = "xb";
+    el.type = "button";
+    el.innerHTML = '<span></span><small></small>';
+    el.firstChild.textContent = b.label;
+    el.lastChild.textContent = b.cmd;
+    bindKey(el, b);
+    box.appendChild(el);
+  });
+}
+
+// One binding for hold + tap. Fires once per state change (no repeats).
+function bindKey(el, b){
+  var down = false;
+  function press(ev){
+    ev.preventDefault();
+    if (down) return;
+    down = true;
+    el.classList.add("held");
+    send(b.cmd);
+  }
+  function release(){
+    if (!down) return;
+    down = false;
+    el.classList.remove("held");
+    if (b.mode === "hold") send(cfg.stopCmd);
+  }
+  el.addEventListener("pointerdown", press);
+  el.addEventListener("pointerup", release);
+  el.addEventListener("pointerleave", release);
+  el.addEventListener("pointercancel", release);
+  el.addEventListener("keydown", function(e){ if (e.key === " " || e.key === "Enter") press(e); });
+  el.addEventListener("keyup", function(e){ if (e.key === " " || e.key === "Enter") release(); });
+  el._press = press; el._release = release;
+}
+
+/* ============================================================
+   8. Speed
+   ============================================================ */
+var spdTimer = null;
+$("#spd").addEventListener("input", function(){
+  var v = this.value;
+  $("#spdOut").textContent = v;
+  cfg.speed.value = Number(v);
+  if (!cfg.speed.enabled) return;
+  clearTimeout(spdTimer);
+  spdTimer = setTimeout(function(){ send((cfg.speed.prefix || "") + v); save(); }, 150);
+});
+
+/* ============================================================
+   9. Keyboard driving (desktop)
+   ============================================================ */
+var KEYMAP = { ArrowUp:"fwd", w:"fwd", ArrowDown:"back", s:"back",
+               ArrowLeft:"left", a:"left", ArrowRight:"right", d:"right", " ":"stop" };
+var keyHeld = {};
+document.addEventListener("keydown", function(e){
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA") return;
+  var id = KEYMAP[e.key] || KEYMAP[e.key.toLowerCase()];
+  if (!id || keyHeld[id]) return;
+  var b = findPad(id); if (!b) return;
+  e.preventDefault();
+  keyHeld[id] = true;
+  padEl(id) && padEl(id).classList.add("held");
+  send(b.cmd);
+});
+document.addEventListener("keyup", function(e){
+  var id = KEYMAP[e.key] || KEYMAP[e.key.toLowerCase()];
+  if (!id || !keyHeld[id]) return;
+  keyHeld[id] = false;
+  var b = findPad(id);
+  padEl(id) && padEl(id).classList.remove("held");
+  if (b && b.mode === "hold") send(cfg.stopCmd);
+});
+function findPad(id){ for (var i=0;i<cfg.pad.length;i++) if (cfg.pad[i].id === id) return cfg.pad[i]; return null; }
+function padEl(id){
+  var b = findPad(id); if (!b) return null;
+  var rc = b.cell.split("/");
+  var all = $("#pad").children;
+  for (var i=0;i<all.length;i++)
+    if (all[i].style.gridRow === rc[0] && all[i].style.gridColumn === rc[1]) return all[i];
+  return null;
+}
+
+/* ============================================================
+   10. Voice
+   ============================================================ */
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var rec = null, recLive = false, recWanted = false;
+
+function buildRec(){
+  if (!SR) return null;
+  var r = new SR();
+  r.lang = cfg.lang;
+  r.interimResults = true;
+  r.continuous = !!$("#vContinuous").checked;
+  r.maxAlternatives = 3;
+
+  r.onstart = function(){ recLive = true; $("#mic").classList.add("live"); };
+  r.onend = function(){
+    recLive = false; $("#mic").classList.remove("live");
+    if (recWanted && $("#vContinuous").checked){ try { r.start(); } catch(e){} }
+  };
+  r.onerror = function(e){
+    if (e.error === "not-allowed") showErr("Microphone blocked. Allow mic access in the address bar, then try again.");
+    else if (e.error !== "no-speech" && e.error !== "aborted") log("er", "Voice: " + e.error);
+  };
+  r.onresult = function(ev){
+    var txt = "", final = false;
+    for (var i = ev.resultIndex; i < ev.results.length; i++){
+      txt += ev.results[i][0].transcript;
+      if (ev.results[i].isFinal) final = true;
+    }
+    txt = txt.trim();
+    var v = $("#heardV");
+    v.textContent = txt || "\u2026";
+    v.classList.remove("mute");
+    if (!final) { $("#heardHit").textContent = ""; return; }
+
+    // try every alternative, best score wins
+    var best = null;
+    var last = ev.results[ev.results.length - 1];
+    for (var k = 0; k < last.length; k++){
+      var m = matchPhrase(last[k].transcript);
+      if (m && (!best || m.score > best.score)) best = m;
+    }
+    var hit = $("#heardHit");
+    if (best){
+      hit.className = "hit ok";
+      hit.textContent = "\u2192 " + best.cmd + "  (" + best.say + ")";
+      send(best.cmd);
+    } else {
+      hit.className = "hit no";
+      hit.textContent = "no matching phrase";
+    }
+  };
+  return r;
+}
+
+function norm(s){
+  return String(s).toLowerCase().replace(/[^a-z0-9\u0900-\u097F\u0B80-\u0BFF ]+/g, " ").replace(/\s+/g, " ").trim();
+}
+function matchPhrase(heard){
+  var h = norm(heard);
+  if (!h) return null;
+  var ht = h.split(" ");
+  var best = null;
+  cfg.phrases.forEach(function(p){
+    var pn = norm(p.say);
+    if (!pn) return;
+    var score = 0;
+    if (h === pn) score = 1;
+    else if (h.indexOf(pn) !== -1) score = 0.9;
+    else {
+      var pt = pn.split(" ");
+      var hits = 0;
+      pt.forEach(function(w){ if (ht.indexOf(w) !== -1) hits++; });
+      score = hits / pt.length;
+      // a lone unmatched keyword is not enough for multi-word phrases
+      if (pt.length > 1 && hits < pt.length) score *= 0.85;
+    }
+    if (score >= 0.6 && (!best || score > best.score))
+      best = { cmd:p.cmd, say:p.say, score:score };
+  });
+  return best;
+}
+
+$("#mic").addEventListener("click", function(){
+  if (!SR) return;
+  if (recLive || recWanted){
+    recWanted = false;
+    try { rec && rec.stop(); } catch(e){}
+    return;
+  }
+  rec = buildRec();
+  recWanted = true;
+  $("#heardHit").textContent = "";
+  try { rec.start(); } catch(e){ log("er", "Voice: " + e.message); }
+});
+$("#vLang").addEventListener("change", function(){
+  cfg.lang = this.value; save();
+  if (recLive){ try { rec.stop(); } catch(e){} }
+});
+$("#vContinuous").addEventListener("change", function(){
+  if (recLive){ try { rec.stop(); } catch(e){} recWanted = false; }
+});
+
+/* ============================================================
+   11. Editors
+   ============================================================ */
+function openVeil(id){ $(id).classList.add("show"); }
+function closeVeil(id){ $(id).classList.remove("show"); }
+document.addEventListener("click", function(e){
+  if (e.target.hasAttribute && e.target.hasAttribute("data-close")) closeVeil("#" + e.target.closest(".veil").id);
+  if (e.target.classList && e.target.classList.contains("veil")) closeVeil("#" + e.target.id);
+});
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape") { closeVeil("#veilBtn"); closeVeil("#veilPhr"); }
+});
+
+function modeSel(v){
+  return '<select><option value="hold"' + (v==="hold"?" selected":"") + '>hold</option>' +
+         '<option value="tap"' + (v==="tap"?" selected":"") + '>tap</option></select>';
+}
+function fillBtnEditor(){
+  var pr = $("#padRows"); pr.innerHTML = "";
+  cfg.pad.forEach(function(b){
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td style="font-family:var(--mono);font-size:12px;color:var(--muted)">' + b.gly + '</td>' +
+      '<td><input value=""></td>' +
+      '<td><input class="cmd" value=""></td>' +
+      '<td>' + (b.id === "stop" ? '<span style="font-size:12px;color:var(--muted)">tap</span>' : modeSel(b.mode)) + '</td>';
+    tr.children[1].firstChild.value = b.label;
+    tr.children[2].firstChild.value = b.cmd;
+    tr.dataset.id = b.id;
+    pr.appendChild(tr);
+  });
+  $("#spdPrefix").value = cfg.speed.prefix || "";
+  $("#spdOn").checked = !!cfg.speed.enabled;
+
+  var xr = $("#xRows"); xr.innerHTML = "";
+  cfg.extras.forEach(function(b){ addXRow(b); });
+}
+function addXRow(b){
+  b = b || { label:"", cmd:"", mode:"tap" };
+  var tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input value=""></td>' +
+    '<td><input class="cmd" value=""></td>' +
+    '<td>' + modeSel(b.mode) + '</td>' +
+    '<td><button class="del" title="Remove">\u2715</button></td>';
+  tr.children[0].firstChild.value = b.label;
+  tr.children[1].firstChild.value = b.cmd;
+  tr.querySelector(".del").addEventListener("click", function(){ tr.remove(); });
+  $("#xRows").appendChild(tr);
+}
+$("#btnAddX").addEventListener("click", function(){ addXRow(); });
+
+$("#btnEdit").addEventListener("click", function(){ fillBtnEditor(); openVeil("#veilBtn"); });
+$("#btnSaveBtns").addEventListener("click", function(){
+  Array.prototype.forEach.call($("#padRows").children, function(tr){
+    var b = findPad(tr.dataset.id);
+    if (!b) return;
+    b.label = tr.children[1].firstChild.value.trim() || b.label;
+    b.cmd   = tr.children[2].firstChild.value;
+    var sel = tr.children[3].querySelector("select");
+    if (sel) b.mode = sel.value;
+    if (b.id === "stop") cfg.stopCmd = b.cmd;
+  });
+  cfg.speed.prefix  = $("#spdPrefix").value;
+  cfg.speed.enabled = $("#spdOn").checked;
+
+  cfg.extras = [];
+  Array.prototype.forEach.call($("#xRows").children, function(tr){
+    var lab = tr.children[0].firstChild.value.trim();
+    var cmd = tr.children[1].firstChild.value;
+    if (!lab && !cmd) return;
+    cfg.extras.push({ label: lab || cmd, cmd: cmd, mode: tr.children[2].querySelector("select").value });
+  });
+  save(); renderPad(); renderExtras(); closeVeil("#veilBtn");
+});
+
+function fillPhrEditor(){
+  var t = $("#phrRows"); t.innerHTML = "";
+  cfg.phrases.forEach(function(p){ addPhrRow(p); });
+}
+function addPhrRow(p){
+  p = p || { say:"", cmd:"" };
+  var tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input value="" placeholder="say this"></td>' +
+    '<td><input class="cmd" value="" placeholder="cmd"></td>' +
+    '<td><button class="del" title="Remove">\u2715</button></td>';
+  tr.children[0].firstChild.value = p.say;
+  tr.children[1].firstChild.value = p.cmd;
+  tr.querySelector(".del").addEventListener("click", function(){ tr.remove(); });
+  $("#phrRows").appendChild(tr);
+}
+$("#btnAddPhr").addEventListener("click", function(){ addPhrRow(); });
+$("#btnPhrases").addEventListener("click", function(e){ e.stopPropagation(); fillPhrEditor(); openVeil("#veilPhr"); });
+$("#btnSavePhr").addEventListener("click", function(){
+  cfg.phrases = [];
+  Array.prototype.forEach.call($("#phrRows").children, function(tr){
+    var say = tr.children[0].firstChild.value.trim();
+    var cmd = tr.children[1].firstChild.value;
+    if (say && cmd) cfg.phrases.push({ say:say, cmd:cmd });
+  });
+  save(); closeVeil("#veilPhr");
+});
+
+/* ============================================================
+   12. Wiring
+   ============================================================ */
+$("#btnBle").addEventListener("click", function(){
+  hideErr();
+  Link.connectBLE().catch(function(e){
+    setStatus("off");
+    if (e.name !== "NotFoundError") showErr(e.message || String(e));
+  });
+});
+$("#btnSer").addEventListener("click", function(){
+  hideErr();
+  Link.connectSerial().catch(function(e){
+    setStatus("off");
+    if (e.name !== "NotFoundError") showErr(e.message || String(e));
+  });
+});
+$("#btnDisc").addEventListener("click", function(){ Link.disconnect(); });
+
+$("#btnSend").addEventListener("click", sendTyped);
+$("#txIn").addEventListener("keydown", function(e){ if (e.key === "Enter") sendTyped(); });
+function sendTyped(){
+  var v = $("#txIn").value;
+  if (!v) return;
+  send(v);
+  $("#txIn").value = "";
+}
+$("#btnClear").addEventListener("click", function(e){
+  e.stopPropagation();
+  termEl.innerHTML = '<div class="term-empty">Cleared.</div>';
+  termCount = 0;
+});
+$("#eol").addEventListener("change", function(){ cfg.eol = this.value; save(); });
+$("#baud").addEventListener("change", function(){
+  cfg.baud = Number(this.value); save();
+  if (Link.kind === "serial") log("sys", "Baud applies on the next connection.");
+});
+
+document.querySelectorAll("[data-fold]").forEach(function(hd){
+  hd.addEventListener("click", function(e){
+    if (e.target.closest("button")) return;
+    hd.parentElement.classList.toggle("closed");
+  });
+});
+
+$("#btnExport").addEventListener("click", function(){
+  var blob = new Blob([JSON.stringify(cfg, null, 2)], { type:"application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "bt-control-config.json";
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+});
+$("#btnImport").addEventListener("click", function(){ $("#fileIn").click(); });
+$("#fileIn").addEventListener("change", function(){
+  var f = this.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    try {
+      var o = JSON.parse(fr.result);
+      cfg = Object.assign(clone(DEFAULTS), o);
+      save(); boot(true);
+      log("sys", "Config loaded from " + f.name + ".");
+    } catch(e){ showErr("That file is not a valid config."); }
+  };
+  fr.readAsText(f);
+  this.value = "";
+});
+$("#btnReset").addEventListener("click", function(){
+  if (!confirm("Reset all buttons, phrases, and settings to defaults?")) return;
+  cfg = clone(DEFAULTS); save(); boot(true);
+});
+
+/* ============================================================
+   13. Boot
+   ============================================================ */
+function boot(isReload){
+  renderPad();
+  renderExtras();
+  $("#eol").value = cfg.eol;
+  $("#baud").value = String(cfg.baud);
+  $("#vLang").value = cfg.lang;
+  $("#spd").value = cfg.speed.value;
+  $("#spdOut").textContent = cfg.speed.value;
+  if (!isReload){
+    capabilityCheck();
+    setStatus("off");
+  }
+}
+boot(false);
+</script>
+</body>
+</html>
