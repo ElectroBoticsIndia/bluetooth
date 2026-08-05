@@ -24,6 +24,9 @@
   --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
   --sans:'DM Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   --r:14px;
+  /* If the name-logo PNG has built-in left padding, nudge it back into
+     alignment with the bot and the tagline. Try -4px or -6px. */
+  --logo-nudge:0px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -41,24 +44,39 @@ button{font-family:inherit;font-size:inherit;color:inherit;border:0;background:n
 input,select{font-family:inherit;font-size:inherit}
 .wrap{max-width:1080px;margin:0 auto;padding:0 14px}
 
-/* ---------- connect bar ---------- */
+/* ---------- brand header (white card, matches micro:bit app) ---------- */
+.hdr{
+  background:#ffffff;
+  border-radius:16px;
+  margin:14px auto 0;
+  max-width:1080px;
+  padding:14px 18px;
+}
+.hdr-in{display:flex;align-items:center;gap:14px}
+.bot{height:64px;width:auto;display:block;flex:0 0 auto}
+.hdr-txt{min-width:0;display:flex;flex-direction:column;align-items:flex-start}
+.wordmark{height:32px;width:auto;display:block;object-fit:contain;object-position:left center;margin-left:var(--logo-nudge)}
+.wordmark.gone{display:none}
+.wm-fb{display:none;font-size:25px;font-weight:700;color:#0a373a;letter-spacing:-.02em;line-height:1}
+.wm-fb i{color:#d0342c;font-style:italic}
+.wm-fb.show{display:block}
+.tag{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--teal);
+  margin-top:5px;margin-left:var(--logo-nudge);
+}
+
+/* ---------- status bar ---------- */
 .topbar{
   position:sticky;top:0;z-index:60;
   background:rgba(6,31,34,.94);
   backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
 }
-.topbar-in{display:flex;align-items:center;gap:10px;padding:10px 14px;max-width:1080px;margin:0 auto}
-.brand{display:flex;align-items:center;gap:9px;min-width:0}
-.brand-mark{
-  width:30px;height:30px;border-radius:9px;flex:0 0 auto;
-  background:linear-gradient(150deg,var(--teal),#00636f);
-  display:grid;place-items:center;
-  font-family:var(--mono);font-weight:700;font-size:13px;color:#00171a;
-}
-.brand-txt{min-width:0}
-.brand-txt b{display:block;font-size:13.5px;line-height:1.15;white-space:nowrap}
-.brand-txt span{display:block;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.topbar-in{display:flex;align-items:center;gap:11px;padding:10px 14px;max-width:1080px;margin:0 auto}
+.stat-txt{min-width:0}
+.stat-txt b{display:block;font-size:13.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
+.stat-txt span{display:block;font-family:var(--mono);font-size:9.5px;color:var(--muted);letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px}
 .topbar-sp{flex:1}
 .conn-group{display:flex;gap:7px;align-items:center}
 .btn{
@@ -82,10 +100,8 @@ input,select{font-family:inherit;font-size:inherit}
 .dot.on{background:var(--good);box-shadow:0 0 0 4px rgba(138,182,0,.16)}
 .dot.busy{background:var(--amber);animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.35}}
-.conn-pill{display:none;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--line-2);border-radius:11px;padding:7px 8px 7px 12px}
+.conn-pill{display:none;align-items:center;gap:9px}
 .conn-pill.show{display:flex}
-.conn-pill .nm{font-family:var(--mono);font-size:12.5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.conn-pill .via{font-family:var(--mono);font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
 
 /* ---------- banner ---------- */
 .banner{margin:12px 0 0;padding:11px 13px;border-radius:12px;font-size:13.5px;display:none;gap:9px;align-items:flex-start}
@@ -258,33 +274,49 @@ td input:focus,td select:focus{outline:none;border-color:var(--teal)}
 .grp>h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#bfe0e2;margin:0 0 4px;font-weight:700}
 
 .foot{text-align:center;font-family:var(--mono);font-size:10.5px;color:#3f6367;margin-top:22px;letter-spacing:.05em}
+@media(max-width:600px){
+  .hdr{padding:12px 14px;margin-top:12px}
+  .hdr-in{gap:11px}
+  .bot{height:52px}
+  .wordmark{height:26px}
+  .wm-fb{font-size:21px}
+  .tag{font-size:10px;letter-spacing:.1em;margin-top:4px}
+}
 @media(max-width:420px){
-  .brand-txt b{font-size:12.5px}
   .btn{padding:8px 11px;font-size:12.5px}
-  .topbar-in{padding:9px 12px;gap:7px}
+  .topbar-in{padding:9px 12px;gap:8px}
+  .stat-txt b{font-size:12.5px;max-width:120px}
+  .stat-txt span{max-width:120px}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 
+<header class="hdr">
+  <div class="hdr-in">
+    <img class="bot" id="botImg" src="logo-on.png" alt="ElectroBotics bot">
+    <div class="hdr-txt">
+      <img class="wordmark" id="wordmark" src="ElectroBotics_No_Makerspace.png" alt="ElectroBotics">
+      <div class="wm-fb" id="wordmarkFb">Electro<i>Botics</i></div>
+      <div class="tag">Arduino Bluetooth Control</div>
+    </div>
+  </div>
+</header>
+
 <div class="topbar">
   <div class="topbar-in">
-    <div class="brand">
-      <div class="brand-mark">EB</div>
-      <div class="brand-txt"><b>Bluetooth Control</b><span>Arduino</span></div>
-    </div>
+    <span class="dot" id="statDot"></span>
+    <span class="stat-txt">
+      <b id="devName">Not connected</b>
+      <span id="devVia">choose a connection</span>
+    </span>
     <div class="topbar-sp"></div>
     <div class="conn-group" id="connGroup">
       <button class="btn primary" id="btnBle">Connect BLE</button>
       <button class="btn" id="btnSer">Serial</button>
     </div>
     <div class="conn-pill" id="connPill">
-      <span class="dot on" id="statDot"></span>
-      <span>
-        <span class="nm" id="devName">device</span>
-        <span class="via" id="devVia">ble</span>
-      </span>
       <button class="btn danger sm" id="btnDisc">Disconnect</button>
     </div>
   </div>
@@ -404,7 +436,7 @@ td input:focus,td select:focus{outline:none;border-color:var(--teal)}
     </div>
   </div>
 
-  <div class="foot">ELECTROBOTICS &middot; HC-05 / HM-10 / ESP32</div>
+  <div class="foot">Built by <b style="color:var(--teal)">ELECTROBOTICS</b> &middot; HC-05 / HM-10 / ESP32 &middot; Chrome &amp; Edge</div>
 </div>
 
 <!-- button editor -->
@@ -726,6 +758,13 @@ function setStatus(s){
   dot.className = "dot" + (s === "on" ? " on" : s === "busy" ? " busy" : "");
   if (s === "on"){ grp.style.display = "none"; pill.classList.add("show"); }
   else { grp.style.display = "flex"; pill.classList.remove("show"); }
+  if (s === "busy"){
+    $("#devName").textContent = "Pairing\u2026";
+    $("#devVia").textContent = "pick your module";
+  } else if (s === "off"){
+    $("#devName").textContent = "Not connected";
+    $("#devVia").textContent = "choose a connection";
+  }
 }
 function onUp(note){
   setStatus("on");
@@ -1163,7 +1202,18 @@ $("#btnReset").addEventListener("click", function(){
 });
 
 /* ============================================================
-   13. Boot
+   13. Brand asset fallbacks
+   ============================================================ */
+// If the PNGs are not uploaded alongside index.html, swap in text
+// rather than showing broken-image icons.
+$("#wordmark").addEventListener("error", function(){
+  this.classList.add("gone");
+  $("#wordmarkFb").classList.add("show");
+});
+$("#botImg").addEventListener("error", function(){ this.style.display = "none"; });
+
+/* ============================================================
+   14. Boot
    ============================================================ */
 function boot(isReload){
   renderPad();
