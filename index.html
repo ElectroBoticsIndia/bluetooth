@@ -110,6 +110,12 @@ input,select{font-family:inherit;font-size:inherit}
   font-size:11.5px;line-height:1.45;color:#f4d99a;
 }
 .cmenu-note b{color:#ffe9b6}
+.cmenu-tip{
+  margin:5px 4px 2px;padding:9px 11px;border-radius:9px;
+  background:rgba(255,255,255,.05);border:1px solid var(--line);
+  font-size:11.5px;line-height:1.45;color:var(--muted);
+}
+.cmenu-tip b{color:#bfe0e2}
 
 /* ---------------- echo strip ---------------- */
 .echo{
@@ -386,6 +392,10 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M10 10v4M14 10v4M18 10v4"/></svg></span>
       <span><b>Serial port</b><small>A paired HC-05. Desktop only.</small></span>
     </button>
+    <div class="cmenu-tip" id="macNote" hidden>
+      <b>On a Mac:</b> if the device list comes up empty, macOS is blocking Bluetooth for this browser.
+      Open System Settings &rarr; Privacy &amp; Security &rarr; Bluetooth and switch it on for Chrome or Edge, then try again.
+    </div>
     <div class="cmenu-note" id="cmenuNote" hidden>
       <b>iPhone and iPad cannot do this in Safari.</b>
       Apple makes every iOS browser use WebKit, which has no Bluetooth or serial access &mdash; so Chrome and Edge on iOS are blocked too.
@@ -888,6 +898,7 @@ $("#btnDisc").addEventListener("click", function(){ Link.disconnect(); });
 // iPadOS reports itself as a Mac, so check for touch as well as platform.
 var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
             (/Mac/.test(navigator.userAgent) && "ontouchend" in document);
+var isMac = /Mac/.test(navigator.userAgent) && !isIOS;
 
 function capabilityCheck(){
   var miss = [];
@@ -896,7 +907,14 @@ function capabilityCheck(){
   var SRc = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SRc){ $("#mic").disabled = true; $("#heardV").textContent = "voice not supported in this browser"; }
   var msgs = [];
-  if (isIOS && miss.length){
+  // macOS gates Bluetooth per app. A blocked browser shows an empty device
+  // list and no error at all, so say so before the student hits it.
+  if (isMac && !miss.length) $("#macNote").hidden = false;
+
+  if (isMac && miss.length === 2){
+    msgs.push("Safari on macOS supports neither Bluetooth nor serial, in any version. Install Chrome, Edge, or Opera and open this page there \u2014 both connection types work fine on a Mac in those browsers.");
+  }
+  else if (isIOS && miss.length){
     $("#cmenuNote").hidden = false;
     msgs.push("On iPhone and iPad, Safari has no Bluetooth or serial access, and Apple makes Chrome and Edge use the same engine \u2014 so they are blocked too. Open this page in the Bluefy or WebBLE browser (free on the App Store) and Bluetooth LE will work. Everything else, including voice, already works here.");
   }
