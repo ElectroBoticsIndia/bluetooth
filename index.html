@@ -27,6 +27,9 @@
   --mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
   --sans:'DM Sans',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   --bar-h:62px;
+  /* Horizontal nudge for the "Bluetooth Control App" tagline in the header.
+     Increase to move it right, use a negative value to move it left. */
+  --tag-nudge:3px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%}
@@ -58,7 +61,8 @@ input,select{font-family:inherit;font-size:inherit}
 .wm-fb.show{display:block}
 .brand-tag{
   font-family:var(--mono);font-size:9.5px;font-weight:500;color:var(--teal);
-  letter-spacing:.11em;text-transform:uppercase;margin-top:4px;white-space:nowrap;
+  letter-spacing:.11em;text-transform:uppercase;white-space:nowrap;
+  margin-top:4px;margin-left:var(--tag-nudge);
 }
 .bar-title{font-size:17px;font-weight:500;color:#0a373a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar-sp{flex:1 1 auto;min-width:6px}
