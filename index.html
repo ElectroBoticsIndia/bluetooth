@@ -47,11 +47,15 @@ input,select{font-family:inherit;font-size:inherit}
 .bar{background:#fff;flex:0 0 auto;position:sticky;top:0;z-index:50;box-shadow:0 2px 12px rgba(0,0,0,.35)}
 .bar-in{display:flex;align-items:center;gap:10px;height:var(--bar-h);padding:0 12px;max-width:1100px;margin:0 auto}
 .ico-btn{
-  width:34px;height:34px;flex:0 0 auto;border-radius:9px;
-  display:grid;place-items:center;color:var(--panel);
+  width:38px;height:38px;flex:0 0 auto;border-radius:10px;
+  display:grid;place-items:center;color:var(--teal-deep);
+  background:rgba(0,143,160,.1);border:1px solid rgba(0,143,160,.3);
+  transition:background .15s,color .15s;
 }
-.ico-btn:hover{background:rgba(10,55,58,.09)}
-.ico-btn svg{width:21px;height:21px}
+.ico-btn:hover{background:var(--teal);color:#fff;border-color:var(--teal)}
+.ico-btn:active{background:var(--teal-deep);border-color:var(--teal-deep)}
+.ico-btn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.ico-btn svg{width:22px;height:22px}
 .bar-bot{height:36px;width:auto;display:block;flex:0 0 auto}
 .brand{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;flex:0 0 auto;min-width:0}
 .brand img{height:19px;width:auto;display:block;object-fit:contain;object-position:left center}
@@ -630,6 +634,7 @@ function go(name){
   });
   var home = name === "home";
   $("#btnBack").hidden     = home;
+  $("#botImg").hidden      = !home;
   $("#brandBlock").hidden  = !home;
   $("#barTitle").hidden    = home;
   $("#barTitle").textContent = SCREENS[name].title;
