@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -105,6 +104,12 @@ input,select{font-family:inherit;font-size:inherit}
 .cmenu b{display:block;font-size:14px;font-weight:500}
 .cmenu small{display:block;font-size:11.5px;color:var(--muted);line-height:1.35}
 .cmenu .ic{width:20px;flex:0 0 auto;margin-top:2px;color:var(--teal-lift)}
+.cmenu-note{
+  margin:5px 4px 2px;padding:10px 11px;border-radius:9px;
+  background:rgba(234,180,58,.12);border:1px solid rgba(234,180,58,.32);
+  font-size:11.5px;line-height:1.45;color:#f4d99a;
+}
+.cmenu-note b{color:#ffe9b6}
 
 /* ---------------- echo strip ---------------- */
 .echo{
@@ -121,7 +126,7 @@ input,select{font-family:inherit;font-size:inherit}
 .app{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
 .screen{display:none;flex:1 1 auto;min-height:0;flex-direction:column}
 .screen.on{display:flex}
-.pane{flex:1 1 auto;overflow-y:auto;padding:16px 14px 26px}
+.pane{flex:1 1 auto;overflow-y:auto;padding:16px 14px calc(30px + env(safe-area-inset-bottom,0px))}
 .pane-in{max-width:640px;margin:0 auto;width:100%}
 /* auto margins centre the control, but collapse to 0 when it overflows,
    so a short screen scrolls instead of clipping the top */
@@ -333,7 +338,11 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
 .note.show{display:block}
 .note.warn{background:rgba(234,180,58,.11);border:1px solid rgba(234,180,58,.34);color:#f4d99a}
 .note.err{background:rgba(215,98,65,.12);border:1px solid rgba(215,98,65,.4);color:#f5b9a3}
-.foot{text-align:center;font-family:var(--mono);font-size:10px;color:#3f6367;padding:14px 10px;letter-spacing:.05em}
+.foot{
+  text-align:center;font-family:var(--mono);font-size:10px;color:#3f6367;letter-spacing:.05em;
+  /* extra room so the gesture / navigation bar never sits on top of it */
+  padding:14px 10px calc(26px + env(safe-area-inset-bottom,0px));
+}
 
 @media(max-width:430px){
   .bar-in{gap:8px;padding:0 10px}
@@ -377,6 +386,11 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M10 10v4M14 10v4M18 10v4"/></svg></span>
       <span><b>Serial port</b><small>A paired HC-05. Desktop only.</small></span>
     </button>
+    <div class="cmenu-note" id="cmenuNote" hidden>
+      <b>iPhone and iPad cannot do this in Safari.</b>
+      Apple makes every iOS browser use WebKit, which has no Bluetooth or serial access &mdash; so Chrome and Edge on iOS are blocked too.
+      Open this page in <b>Bluefy</b> or <b>WebBLE</b> instead (free on the App Store, they ship their own Bluetooth stack) and BLE will work normally.
+    </div>
   </div>
 </div>
 
@@ -871,6 +885,10 @@ $("#optSer").addEventListener("click", function(){
 });
 $("#btnDisc").addEventListener("click", function(){ Link.disconnect(); });
 
+// iPadOS reports itself as a Mac, so check for touch as well as platform.
+var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+            (/Mac/.test(navigator.userAgent) && "ontouchend" in document);
+
 function capabilityCheck(){
   var miss = [];
   if (!navigator.bluetooth){ miss.push("Web Bluetooth"); $("#optBle").disabled = true; }
@@ -878,7 +896,11 @@ function capabilityCheck(){
   var SRc = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SRc){ $("#mic").disabled = true; $("#heardV").textContent = "voice not supported in this browser"; }
   var msgs = [];
-  if (miss.length === 2) msgs.push("This browser has neither Bluetooth nor serial access. Use Chrome or Edge \u2014 Safari and Firefox support neither.");
+  if (isIOS && miss.length){
+    $("#cmenuNote").hidden = false;
+    msgs.push("On iPhone and iPad, Safari has no Bluetooth or serial access, and Apple makes Chrome and Edge use the same engine \u2014 so they are blocked too. Open this page in the Bluefy or WebBLE browser (free on the App Store) and Bluetooth LE will work. Everything else, including voice, already works here.");
+  }
+  else if (miss.length === 2) msgs.push("This browser has neither Bluetooth nor serial access. Use Chrome or Edge \u2014 Safari and Firefox support neither.");
   else if (miss.length === 1) msgs.push(miss[0] === "Web Serial"
       ? "Serial is unavailable here. That is normal on a phone \u2014 use a BLE module. HC-05 over serial needs a desktop."
       : "Bluetooth LE is unavailable here. Connect a paired HC-05 through Serial instead.");
