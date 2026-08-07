@@ -193,6 +193,13 @@ input,select{font-family:inherit;font-size:inherit}
 .ic-drive  {background:#d2a747;color:#4a3705}
 .ic-voice  {background:#c8775e;color:#fdeee8}
 .ic-cfg    {background:#a4b6b6;color:#0e3b3f}
+.ic-diag   {background:#154a4f;color:#cde5e7}
+.diag{font-family:var(--mono);font-size:11.5px;line-height:1.7}
+.diag div{display:flex;gap:8px;border-bottom:1px solid rgba(255,255,255,.05);padding:3px 0}
+.diag .k{color:var(--muted);flex:0 0 96px}
+.diag .v{flex:1;min-width:0;word-break:break-all}
+.diag .yes{color:var(--good)}
+.diag .no{color:var(--bad)}
 .hint{font-size:12.5px;color:var(--muted);margin:0 0 11px}
 .btn{
   border:1px solid var(--line-2);background:var(--panel);border-radius:10px;
@@ -582,6 +589,13 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
         </div>
         <input type="file" id="fileIn" accept="application/json" hidden>
       </div>
+
+      <div class="card">
+        <h3><span class="ic ic-diag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-7 5 14L17 12h4"/></svg></span>Diagnostics</h3>
+        <p class="hint">What this browser actually supports. Screenshot or copy this if a connection will not start.</p>
+        <div class="diag" id="diag"></div>
+        <button class="btn sm" id="btnCopyDiag" style="margin-top:10px">Copy</button>
+      </div>
     </div></div>
   </section>
 
@@ -693,18 +707,46 @@ var Link = {
 };
 
 Link.connectBLE = async function(){
-  if (!navigator.bluetooth) throw new Error("This browser has no Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS, or Linux.");
+  if (!navigator.bluetooth) throw new Error("This browser has no Web Bluetooth. On iPhone use the Bluefy browser; elsewhere use Chrome or Edge.");
   setStatus("busy");
-  var dev = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:SERVICE_UUIDS });
+
+  // Bluefy and some WebBLE builds reject acceptAllDevices, so fall back to
+  // an explicit service filter if the open request is refused.
+  var dev;
+  try {
+    dev = await navigator.bluetooth.requestDevice({ acceptAllDevices:true, optionalServices:SERVICE_UUIDS });
+  } catch(e){
+    if (e.name === "NotFoundError" || e.name === "AbortError") throw e;   // user cancelled
+    dev = await navigator.bluetooth.requestDevice({
+      filters: SERVICE_UUIDS.map(function(u){ return { services:[u] }; }),
+      optionalServices: SERVICE_UUIDS
+    });
+  }
+
   var server = await dev.gatt.connect();
-  var services = await server.getPrimaryServices();
+
+  // getPrimaryServices() with no argument is not implemented everywhere.
+  // If it comes back empty, probe each known UART service by name instead.
+  var services = [];
+  try { services = await server.getPrimaryServices(); } catch(e){ services = []; }
+  if (!services.length){
+    for (var u = 0; u < SERVICE_UUIDS.length; u++){
+      try { services.push(await server.getPrimaryService(SERVICE_UUIDS[u])); } catch(e){}
+    }
+  }
+  if (!services.length){
+    try { dev.gatt.disconnect(); } catch(e){}
+    throw new Error("Connected, but no UART service was found. If this is an HM-10 clone, its service UUID may be non-standard \u2014 tell me the UUID and I will add it.");
+  }
+
   var txChar = null, rxChar = null;
   for (var i = 0; i < services.length; i++){
-    var chars = await services[i].getCharacteristics();
+    var chars = [];
+    try { chars = await services[i].getCharacteristics(); } catch(e){ continue; }
     for (var j = 0; j < chars.length; j++){
-      var c = chars[j], p = c.properties;
-      if (!txChar && (p.write || p.writeWithoutResponse)) txChar = c;
-      if (!rxChar && (p.notify || p.indicate)) rxChar = c;
+      var c = chars[j], pr = c.properties || {};
+      if (!txChar && (pr.write || pr.writeWithoutResponse)) txChar = c;
+      if (!rxChar && (pr.notify || pr.indicate)) rxChar = c;
     }
     if (txChar && rxChar) break;
   }
@@ -713,10 +755,12 @@ Link.connectBLE = async function(){
     throw new Error("No writable characteristic found. Check this is a BLE module, not an HC-05.");
   }
   if (rxChar){
-    await rxChar.startNotifications();
-    rxChar.addEventListener("characteristicvaluechanged", function(ev){
-      onBytes(new Uint8Array(ev.target.value.buffer));
-    });
+    try {
+      await rxChar.startNotifications();
+      rxChar.addEventListener("characteristicvaluechanged", function(ev){
+        onBytes(new Uint8Array(ev.target.value.buffer));
+      });
+    } catch(e){ rxChar = null; }
   }
   dev.addEventListener("gattserverdisconnected", function(){ Link._down("Device disconnected."); });
   Link._ble.dev = dev; Link._ble.tx = txChar;
@@ -901,29 +945,38 @@ var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
 var isMac = /Mac/.test(navigator.userAgent) && !isIOS;
 
 function capabilityCheck(){
-  var miss = [];
-  if (!navigator.bluetooth){ miss.push("Web Bluetooth"); $("#optBle").disabled = true; }
-  if (!navigator.serial){ miss.push("Web Serial"); $("#optSer").disabled = true; }
+  var noBle    = !navigator.bluetooth;
+  var noSerial = !navigator.serial;
+  $("#optBle").disabled = noBle;
+  $("#optSer").disabled = noSerial;
+
   var SRc = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SRc){ $("#mic").disabled = true; $("#heardV").textContent = "voice not supported in this browser"; }
-  var msgs = [];
-  // macOS gates Bluetooth per app. A blocked browser shows an empty device
-  // list and no error at all, so say so before the student hits it.
-  if (isMac && !miss.length) $("#macNote").hidden = false;
 
-  if (isMac && miss.length === 2){
+  var msgs = [];
+
+  if (isIOS){
+    // Bluefy and WebBLE provide navigator.bluetooth, so only warn when it is
+    // genuinely absent. Missing Web Serial is normal on iOS and not worth a
+    // warning on its own - no iPhone can open a COM port anyway.
+    if (noBle){
+      $("#cmenuNote").hidden = false;
+      msgs.push("Safari on iPhone and iPad has no Bluetooth access, and Apple makes Chrome and Edge use the same engine, so they are blocked too. Open this page in the Bluefy or WebBLE browser (free on the App Store) and Bluetooth LE will work.");
+    }
+  }
+  else if (isMac && noBle && noSerial){
     msgs.push("Safari on macOS supports neither Bluetooth nor serial, in any version. Install Chrome, Edge, or Opera and open this page there \u2014 both connection types work fine on a Mac in those browsers.");
   }
-  else if (isIOS && miss.length){
-    $("#cmenuNote").hidden = false;
-    msgs.push("On iPhone and iPad, Safari has no Bluetooth or serial access, and Apple makes Chrome and Edge use the same engine \u2014 so they are blocked too. Open this page in the Bluefy or WebBLE browser (free on the App Store) and Bluetooth LE will work. Everything else, including voice, already works here.");
+  else {
+    if (isMac && !noBle) $("#macNote").hidden = false;
+    if (noBle && noSerial) msgs.push("This browser has neither Bluetooth nor serial access. Use Chrome or Edge \u2014 Safari and Firefox support neither.");
+    else if (noBle)        msgs.push("Bluetooth LE is unavailable here. Connect a paired HC-05 through Serial instead.");
+    else if (noSerial)     msgs.push("Serial is unavailable here. That is normal on a phone \u2014 use a BLE module. HC-05 over serial needs a desktop.");
   }
-  else if (miss.length === 2) msgs.push("This browser has neither Bluetooth nor serial access. Use Chrome or Edge \u2014 Safari and Firefox support neither.");
-  else if (miss.length === 1) msgs.push(miss[0] === "Web Serial"
-      ? "Serial is unavailable here. That is normal on a phone \u2014 use a BLE module. HC-05 over serial needs a desktop."
-      : "Bluetooth LE is unavailable here. Connect a paired HC-05 through Serial instead.");
+
   if (location.protocol !== "https:" && location.hostname !== "localhost")
     msgs.push("Open this page over HTTPS. Bluetooth, serial, and the microphone are all blocked on plain http.");
+
   if (msgs.length){
     var b = $("#noteWarn");
     b.textContent = msgs.join(" ");
@@ -1326,6 +1379,54 @@ $("#btnReset").addEventListener("click", function(){
 });
 
 /* ============================================================
+   14b. Diagnostics
+   ============================================================ */
+function diagRows(){
+  return [
+    ["Bluetooth", !!navigator.bluetooth],
+    ["Serial",    !!navigator.serial],
+    ["Speech",    !!(window.SpeechRecognition || window.webkitSpeechRecognition)],
+    ["Secure",    location.protocol === "https:" || location.hostname === "localhost"],
+    ["Protocol",  location.protocol],
+    ["Host",      location.hostname],
+    ["Platform",  isIOS ? "iOS" : isMac ? "macOS" : "other"],
+    ["Browser",   navigator.userAgent]
+  ];
+}
+function fillDiag(){
+  var box = $("#diag");
+  box.innerHTML = "";
+  diagRows().forEach(function(r){
+    var d = document.createElement("div");
+    var k = document.createElement("span"); k.className = "k"; k.textContent = r[0];
+    var v = document.createElement("span"); v.className = "v";
+    if (typeof r[1] === "boolean"){
+      v.classList.add(r[1] ? "yes" : "no");
+      v.textContent = r[1] ? "yes" : "no";
+    } else v.textContent = r[1];
+    d.appendChild(k); d.appendChild(v);
+    box.appendChild(d);
+  });
+}
+$("#btnCopyDiag").addEventListener("click", function(){
+  var txt = diagRows().map(function(r){
+    return r[0] + ": " + (typeof r[1] === "boolean" ? (r[1] ? "yes" : "no") : r[1]);
+  }).join("\n");
+  var btn = this;
+  function done(){ btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = "Copy"; }, 1400); }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done, function(){ fallbackCopy(txt); done(); });
+  } else { fallbackCopy(txt); done(); }
+});
+function fallbackCopy(txt){
+  var ta = document.createElement("textarea");
+  ta.value = txt; ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); } catch(e){}
+  document.body.removeChild(ta);
+}
+
+/* ============================================================
    15. Brand asset fallbacks
    ============================================================ */
 $("#wordmark").addEventListener("error", function(){
@@ -1345,6 +1446,7 @@ function boot(isReload){
   $("#spd").value = cfg.speed.value;
   $("#spdOut").textContent = cfg.speed.value;
   fillSettings();
+  fillDiag();
   if (!isReload){ capabilityCheck(); setStatus("off"); go("home"); }
 }
 boot(false);
