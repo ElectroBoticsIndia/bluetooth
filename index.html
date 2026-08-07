@@ -703,7 +703,8 @@ var SERVICE_UUIDS = [
 ];
 
 // Some modules do not advertise their service UUID, so match on name too.
-var NAME_PREFIXES = ["HM", "HMSoft", "BT05", "MLT", "AT-", "JDY", "DSD", "ESP", "BLE", "Bolutek"];
+var NAME_PREFIXES = ["HM", "HMSoft", "BT", "MLT", "AT-", "JDY", "DSD", "ESP", "BLE",
+                     "Bolutek", "CC41", "Feasy", "Micro", "Arduino", "HC"];
 
 var Link = {
   kind:null, name:"", connected:false,
@@ -712,9 +713,8 @@ var Link = {
   _q: Promise.resolve()
 };
 
-// Bluefy does not reliably honour acceptAllDevices, so on iOS we lead with an
-// explicit filter list and keep acceptAllDevices as the fallback. Elsewhere the
-// order is reversed, since acceptAllDevices shows every nearby module.
+// acceptAllDevices lists every nearby module, which is what we want in a room
+// full of them. If a browser refuses that form we retry with explicit filters.
 async function pickDevice(){
   var openReq   = { acceptAllDevices:true, optionalServices:SERVICE_UUIDS };
   var filterReq = {
@@ -722,7 +722,7 @@ async function pickDevice(){
              .concat(NAME_PREFIXES.map(function(n){ return { namePrefix:n }; })),
     optionalServices: SERVICE_UUIDS
   };
-  var order = isIOS ? [filterReq, openReq] : [openReq, filterReq];
+  var order = [openReq, filterReq];
   var lastErr = null;
 
   for (var i = 0; i < order.length; i++){
