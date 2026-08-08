@@ -393,7 +393,11 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
   <div class="cmenu" id="cmenu">
     <button id="optBle">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></span>
-      <span><b>Bluetooth LE</b><small>HM-10, AT-09, ESP32. Works on Android and desktop.</small></span>
+      <span><b>Bluetooth LE</b><small>Shows known modules only &mdash; HM-10, AT-09, ESP32, Pico W. Start here.</small></span>
+    </button>
+    <button id="optAll">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.5"/><path d="M7.5 16.5a6.4 6.4 0 0 1 0-9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.5 19.5a10.6 10.6 0 0 1 0-15M19.5 4.5a10.6 10.6 0 0 1 0 15"/></svg></span>
+      <span><b>All BLE devices</b><small>Longer list. Use this if your module is missing above.</small></span>
     </button>
     <button id="optSer">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10v4M10 10v4M14 10v4M18 10v4"/></svg></span>
@@ -404,9 +408,9 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
       Open System Settings &rarr; Privacy &amp; Security &rarr; Bluetooth and switch it on for Chrome or Edge, then try again.
     </div>
     <div class="cmenu-note" id="cmenuNote" hidden>
-      <b>iPhone and iPad cannot do this in Safari.</b>
-      Apple makes every iOS browser use WebKit, which has no Bluetooth or serial access &mdash; so Chrome and Edge on iOS are blocked too.
-      Open this page in <b>Bluefy</b> or <b>WebBLE</b> instead (free on the App Store, they ship their own Bluetooth stack) and BLE will work normally.
+      <b>Safari cannot do Bluetooth &mdash; but <span style="color:#ffe9b6">Bluefy</span> can.</b>
+      Apple makes every iOS browser use WebKit, which has no Bluetooth access, so Chrome and Edge on iPhone are blocked too.
+      Open this page in the free <b>Bluefy</b> browser from the App Store and BLE works normally &mdash; we have tested it on iPhone with an HM-10.
     </div>
   </div>
 </div>
@@ -446,7 +450,7 @@ td select{min-width:0;padding-left:8px;padding-right:4px}
         <span class="tile-lb">Settings</span>
       </button>
     </div>
-    <div class="foot">Built by <b style="color:var(--teal)">ELECTROBOTICS</b> &middot; HC-05 / HM-10 / ESP32</div>
+    <div class="foot">Built by <b style="color:var(--teal)">ELECTROBOTICS</b> &middot; HM-10 / ESP32 / Pico W / HC-05</div>
   </section>
 
   <!-- ============ ARROW KEYS ============ -->
@@ -713,16 +717,18 @@ var Link = {
   _q: Promise.resolve()
 };
 
-// acceptAllDevices lists every nearby module, which is what we want in a room
-// full of them. If a browser refuses that form we retry with explicit filters.
-async function pickDevice(){
+// "known" narrows the chooser to modules we recognise, which is far less
+// confusing for a student than a screen of unnamed MAC addresses. "all" is the
+// escape hatch for a module that advertises neither a known service nor name.
+// Either way the other form is kept as a fallback in case a browser refuses one.
+async function pickDevice(mode){
   var openReq   = { acceptAllDevices:true, optionalServices:SERVICE_UUIDS };
   var filterReq = {
     filters: SERVICE_UUIDS.map(function(u){ return { services:[u] }; })
              .concat(NAME_PREFIXES.map(function(n){ return { namePrefix:n }; })),
     optionalServices: SERVICE_UUIDS
   };
-  var order = [openReq, filterReq];
+  var order = (mode === "all") ? [openReq, filterReq] : [filterReq, openReq];
   var lastErr = null;
 
   for (var i = 0; i < order.length; i++){
@@ -740,11 +746,11 @@ async function pickDevice(){
   throw lastErr;
 }
 
-Link.connectBLE = async function(){
-  if (!navigator.bluetooth) throw new Error("This browser has no Web Bluetooth. On iPhone use the Bluefy browser; elsewhere use Chrome or Edge.");
+Link.connectBLE = async function(mode){
+  if (!navigator.bluetooth) throw new Error("This browser has no Web Bluetooth. On iPhone use the free Bluefy browser; elsewhere use Chrome or Edge.");
   setStatus("busy");
 
-  var dev = await pickDevice();
+  var dev = await pickDevice(mode || "known");
 
   var server = await dev.gatt.connect();
 
@@ -946,13 +952,17 @@ $("#btnConn").addEventListener("click", function(e){
 document.addEventListener("click", function(e){
   if (!e.target.closest || !e.target.closest("#cmenu")) closeMenu();
 });
-$("#optBle").addEventListener("click", function(){
+function startBle(mode){
   closeMenu(); hideErr();
-  Link.connectBLE().catch(function(e){
+  Link.connectBLE(mode).catch(function(e){
     setStatus("off");
-    if (e.name !== "NotFoundError") showErr(e.message || String(e));
+    if (e.name === "NotFoundError" && mode === "known")
+      showErr("No known module found. Tap Connect again and choose \u201cAll BLE devices\u201d, or rename your module with AT+NAME so it is recognised.");
+    else if (e.name !== "NotFoundError") showErr(e.message || String(e));
   });
-});
+}
+$("#optBle").addEventListener("click", function(){ startBle("known"); });
+$("#optAll").addEventListener("click", function(){ startBle("all"); });
 $("#optSer").addEventListener("click", function(){
   closeMenu(); hideErr();
   Link.connectSerial().catch(function(e){
@@ -971,6 +981,7 @@ function capabilityCheck(){
   var noBle    = !navigator.bluetooth;
   var noSerial = !navigator.serial;
   $("#optBle").disabled = noBle;
+  $("#optAll").disabled = noBle;
   $("#optSer").disabled = noSerial;
 
   var SRc = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -984,7 +995,7 @@ function capabilityCheck(){
     // warning on its own - no iPhone can open a COM port anyway.
     if (noBle){
       $("#cmenuNote").hidden = false;
-      msgs.push("Safari on iPhone and iPad has no Bluetooth access, and Apple makes Chrome and Edge use the same engine, so they are blocked too. Open this page in the Bluefy or WebBLE browser (free on the App Store) and Bluetooth LE will work.");
+      msgs.push("Safari on iPhone and iPad has no Bluetooth access, and Apple makes Chrome and Edge use the same engine, so they are blocked too. Open this page in the free Bluefy browser from the App Store and Bluetooth LE works normally \u2014 tested on iPhone with an HM-10.");
     }
   }
   else if (isMac && noBle && noSerial){
